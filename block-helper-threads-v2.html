@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>封鎖小工具 // Threads</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #ffffff;
+    --accent2: #aaaaaa;
+    --text: #e8e8e8;
+    --muted: #666;
+    --active-bg: #1e1e1e;
+    --active-border: #ffffff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.1rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 span { color: #fff; }
+
+  .subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 28px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  #inputScreen { width: 100%; max-width: 520px; }
+
+  .input-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid #fff;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .input-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .input-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+
+  .input-hint code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: #222;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #ccc;
+    font-size: 0.78rem;
+  }
+
+  textarea {
+    width: 100%;
+    height: 200px;
+    background: #111;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    padding: 12px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: #fff; }
+  textarea::placeholder { color: #444; }
+
+  .btn-start {
+    width: 100%;
+    padding: 14px;
+    background: #fff;
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .btn-start:hover { background: #ddd; }
+  .btn-start:active { transform: scale(0.98); }
+
+  .parse-error {
+    font-size: 0.78rem;
+    color: #ff3c3c;
+    margin-top: 10px;
+    min-height: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  #toolScreen { display: none; width: 100%; max-width: 520px; }
+
+  .current-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 3px solid #fff;
+    border-radius: 12px;
+    padding: 28px 32px;
+    width: 100%;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .current-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .current-index {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+
+  .current-username {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: #fff;
+    letter-spacing: 0.02em;
+    word-break: break-all;
+    margin-bottom: 8px;
+    text-decoration: none;
+    display: block;
+    transition: color 0.15s;
+  }
+  .current-username:hover { color: #aaa; }
+
+  .open-hint { font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+
+  .copy-status {
+    font-size: 0.8rem;
+    color: var(--muted);
+    height: 20px;
+    transition: color 0.2s;
+  }
+  .copy-status.success { color: #4caf50; }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 14px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .btn:hover { border-color: #555; background: #222; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-copy {
+    background: #fff;
+    border-color: #fff;
+    color: #000;
+    font-weight: 600;
+    flex: 1.4;
+  }
+  .btn-copy:hover { background: #ddd; border-color: #ddd; }
+  .btn-copy.copied { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+
+  .btn-reset {
+    width: 100%;
+    margin-bottom: 20px;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .btn-reset:hover { border-color: #555; color: var(--text); }
+
+  .progress-bar-wrap {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    height: 6px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #fff, #aaa);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+  }
+
+  .list-wrap {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .list-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .list-scroll { max-height: 380px; overflow-y: auto; }
+  .list-scroll::-webkit-scrollbar { width: 4px; }
+  .list-scroll::-webkit-scrollbar-track { background: transparent; }
+  .list-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  .list-item {
+    display: flex;
+    align-items: center;
+    padding: 11px 20px;
+    border-bottom: 1px solid #1f1f1f;
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: 12px;
+  }
+  .list-item:hover { background: #222; }
+  .list-item.active { background: var(--active-bg); border-left: 3px solid #fff; }
+  .list-item.done { opacity: 0.5; }
+  .list-item.done .item-name { text-decoration: line-through; color: var(--muted); }
+
+  .item-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    min-width: 28px;
+  }
+  .list-item.active .item-num { color: #fff; }
+
+  .item-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    flex: 1;
+    word-break: break-all;
+  }
+
+  .item-done-btn {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .item-done-btn:hover { border-color: #4caf50; color: #4caf50; }
+  .list-item.done .item-done-btn { border-color: #2e7d32; color: #4caf50; }
+</style>
+</head>
+<body>
+
+<h1>封鎖小工具 <span>// Threads</span></h1>
+<p class="subtitle">貼上帳號清單，一鍵複製、逐一封鎖<br>所有資料只存在你的瀏覽器，不會上傳任何地方</p>
+
+<div id="inputScreen">
+  <div class="input-card">
+    <div class="input-label">貼上帳號清單</div>
+    <div class="input-hint">
+      支援以下格式，每行一個：<br>
+      <code>@username</code>　<code>username</code>　<code>threads.com/@username</code>　<code>instagram.com/username</code>
+    </div>
+    <textarea id="accountInput" placeholder="@example_user&#10;another_user&#10;https://www.threads.com/@someone&#10;..."></textarea>
+    <div class="parse-error" id="parseError"></div>
+  </div>
+  <button class="btn-start" onclick="startTool()">開始封鎖 →</button>
+</div>
+
+<div id="toolScreen">
+  <div class="current-card">
+    <div class="current-label">目前帳號</div>
+    <div class="current-index" id="currentIndex">#1 / 0</div>
+    <a class="current-username" id="currentUsername" href="#" target="_blank">@username</a>
+    <div class="open-hint">↗ 點帳號名稱直接開啟 Threads 頁面</div>
+    <div class="copy-status" id="copyStatus">點「複製帳號」即可複製</div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" onclick="prev()">← 上一個</button>
+    <button class="btn btn-copy" id="btnCopy" onclick="copyAccount()">複製帳號</button>
+    <button class="btn" onclick="next()">下一個 →</button>
+  </div>
+
+  <button class="btn-reset" onclick="resetTool()">← 重新輸入名單</button>
+
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progressBar" style="width:0%"></div>
+  </div>
+
+  <div class="list-wrap">
+    <div class="list-header">
+      <span>全部帳號</span>
+      <span id="doneCount">已封鎖 0 / 0</span>
+    </div>
+    <div class="list-scroll" id="listScroll"></div>
+  </div>
+</div>
+
+<script>
+let unique = [];
+let total = 0;
+let current = 0;
+let done = new Set();
+
+function parseAccounts(raw) {
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const results = [];
+  for (const line of lines) {
+    let username = null;
+    const urlMatch = line.match(/(?:instagram\.com|threads\.com\/@?|threads\.net\/@?)([A-Za-z0-9_.]+)/i);
+    if (urlMatch) {
+      username = urlMatch[1];
+    } else {
+      const plain = line.replace(/^@/, '').trim();
+      if (/^[A-Za-z0-9_.]+$/.test(plain)) username = plain;
+    }
+    if (username) results.push(username);
+  }
+  return [...new Set(results)];
+}
+
+function startTool() {
+  const raw = document.getElementById('accountInput').value;
+  const parsed = parseAccounts(raw);
+  if (parsed.length === 0) {
+    document.getElementById('parseError').textContent = '⚠ 找不到有效帳號，請確認格式是否正確';
+    return;
+  }
+  document.getElementById('parseError').textContent = '';
+  unique = parsed;
+  total = unique.length;
+  current = 0;
+  done = new Set();
+  document.getElementById('inputScreen').style.display = 'none';
+  document.getElementById('toolScreen').style.display = 'block';
+  render();
+}
+
+function resetTool() {
+  document.getElementById('toolScreen').style.display = 'none';
+  document.getElementById('inputScreen').style.display = 'block';
+}
+
+function render() {
+  document.getElementById('currentIndex').textContent = `#${current+1} / ${total}`;
+  const el = document.getElementById('currentUsername');
+  el.textContent = `@${unique[current]}`;
+  el.href = `https://www.threads.com/@${unique[current]}`;
+  document.getElementById('copyStatus').textContent = '點「複製帳號」即可複製';
+  document.getElementById('copyStatus').className = 'copy-status';
+  document.getElementById('btnCopy').className = 'btn btn-copy';
+  document.getElementById('btnCopy').textContent = '複製帳號';
+
+  const doneCount = done.size;
+  document.getElementById('doneCount').textContent = `已封鎖 ${doneCount} / ${total}`;
+  document.getElementById('progressBar').style.width = `${(doneCount/total)*100}%`;
+
+  renderList();
+  setTimeout(() => {
+    const activeEl = document.querySelector('.list-item.active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, 50);
+}
+
+function renderList() {
+  const scroll = document.getElementById('listScroll');
+  scroll.innerHTML = '';
+  unique.forEach((acc, i) => {
+    const div = document.createElement('div');
+    div.className = 'list-item' + (i === current ? ' active' : '') + (done.has(i) ? ' done' : '');
+    div.innerHTML = `
+      <span class="item-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="item-name">@${acc}</span>
+      <button class="item-done-btn" onclick="toggleDone(event,${i})">${done.has(i) ? '✓ 已封鎖' : '標記'}</button>
+    `;
+    div.addEventListener('click', (e) => {
+      if (e.target.classList.contains('item-done-btn')) return;
+      current = i;
+      render();
+    });
+    scroll.appendChild(div);
+  });
+}
+
+function copyAccount() {
+  const username = unique[current];
+  navigator.clipboard.writeText(username).then(() => {
+    showCopied(username);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = username;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showCopied(username);
+  });
+}
+
+function showCopied(username) {
+  const status = document.getElementById('copyStatus');
+  const btn = document.getElementById('btnCopy');
+  status.textContent = `✓ 已複製 @${username}`;
+  status.className = 'copy-status success';
+  btn.className = 'btn btn-copy copied';
+  btn.textContent = '✓ 已複製！';
+  setTimeout(() => {
+    btn.textContent = '複製帳號';
+    btn.className = 'btn btn-copy';
+  }, 1500);
+}
+
+function next() {
+  if (current < total - 1) { current++; render(); copyAccount(); }
+}
+
+function prev() {
+  if (current > 0) { current--; render(); copyAccount(); }
+}
+
+function toggleDone(e, i) {
+  e.stopPropagation();
+  if (done.has(i)) { done.delete(i); } else { done.add(i); }
+  render();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('toolScreen').style.display === 'none') return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next();
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prev();
+  if (e.key === 'c' || e.key === 'C') copyAccount();
+  if (e.key === 'Enter') { toggleDone({ stopPropagation: ()=>{} }, current); next(); }
+});
+</script>
+</body>
+</html>
